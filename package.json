@@ -22,6 +22,7 @@
     "got": "^11.8.2"
   },
   "devDependencies": {
+    "@types/cheerio": "^0.22.27",
     "rimraf": "^3.0.2",
     "typescript": "^4.2.3"
   }

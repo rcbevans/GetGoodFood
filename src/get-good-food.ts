@@ -1,111 +1,173 @@
 import got from "got";
 import cheerio from "cheerio";
 
-export type Author = {
-    name: string,
-    url?: string
-};
+import { Recipe } from './types/recipe';
+import { RecipeConfig, TextSelector, AttributeSelector, IngredientConfig, MethodConfig, RatingConfig, TimingConfig, AuthorConfig, ImageConfig } from './types/recipe-config';
+import { GoodFoodConfig } from './configs/good-food';
+import { RecipeAuthor } from './types/recipe-author';
+import { RecipeIngredient } from './types/recipe-ingredient';
+import { RecipeStep } from './types/recipe-step';
+import { RecipeRating } from './types/recipe-rating';
+import { RecipeTiming } from './types/recipe-timing';
+import { AllRecipesConfig } from './configs/all-recipes';
 
-export type Rating = {
-    score?: number,
-    ratingCount?: number
+const normalizeString = (str: string) => {
+    return str
+        .replace("\r\n", "")
+        .replace("\n", "")
+        .replace("\t", "")
+        .replace(/\s{2,}/g, " ")
+        .trim();
 }
 
-export type Timing = {
-    label: string,
-    duration: string
-}
+const evaluate = ($: cheerio.Root | cheerio.Cheerio, selector: TextSelector | AttributeSelector): string | undefined => {
+    const node =
+        typeof ($) === "function" ?
+            selector.selector ?
+                $(selector.selector) :
+                $.root() :
+            selector.selector ?
+                $.find(selector.selector) :
+                $;
 
-export type Ingredient = {
-    quantity?: number,
-    units?: string,
-    name: string
-    preparation?: string
-}
-
-export type Step = {
-    index: number,
-    instruction: string
-}
-
-export type Recipe = {
-    title: string,
-    author: Author,
-    rating: Rating,
-    timings: Timing[]
-    skillLevel: string,
-    servingSize: number,
-    ingredients: Ingredient[],
-    method: Step[]
-}
-
-const isValidUrl = (url: string) => {
-    const parsedUrl = new URL(url);
-    return parsedUrl.host.localeCompare("www.bbcgoodfood.com", undefined, { sensitivity: "accent" }) === 0;
-}
-
-const scoreRegex: RegExp = new RegExp(/.*(?<score>\d[.\d+]?).*(?<total>\d[.\d+]?).*/);
-const timingRegex: RegExp = new RegExp(/(?<label>.*):.*/);
-const servingRegex: RegExp = new RegExp(/.*(?<servingCount>\d+).*/);
-
-export const Recipe = async (url: string): Promise<Recipe | null> => {
-
-    if (!isValidUrl(url)) {
-        return null;
-    }
-
-    const response = await got(url, {
-        headers: {
-            "user-agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"
-        }
-    });
-
-    const $ = cheerio.load(response.body);
-
-    const postHeader = $(".post-header")
-    const postContent = $('.post__content');
-
-    const titleNode = postHeader.find(".post-header__title");
-    const authorNode = postHeader.find('.post-header__author a');
-    const ratingValuesNode = postHeader.find('.rating__values');
-    const ratingStarsNode = ratingValuesNode.find('.sr-only');
-    const ratingCountText = ratingValuesNode.find('.rating__count-text');
-    const cookAndPrepTimeNodes = postHeader.find('.post-header__cook-and-prep-time').find('ul.list > li');
-    const skillLevelNode = postHeader.find('.post-header__skill-level');
-    const servingCountNode = postHeader.find('.post-header__servings');
-
-    const ingreedientsNode = postContent.find('.recipe__ingredients');
-    const ingreedientListNodes = ingreedientsNode.find('ul.list > li');
-
-    const methodNode = postContent.find('.recipe__method-steps');
-    const methodStepsNodes = methodNode.find('ul.list > li');
-
-    return {
-        title: titleNode.text(),
-        author: authorNode && {
-            name: authorNode.text(),
-            url: authorNode.attr['href'] ? "www.bbcgoodfood.com" + authorNode.attr['href'] : undefined
-        },
-        skillLevel: skillLevelNode.text(),
-        servingSize: parseInt(servingRegex.exec(servingCountNode.text())?.groups?.['servingCount'] || ''),
-        rating: {
-            score: parseFloat(scoreRegex.exec(ratingStarsNode.text())?.groups?.['score'] || '0'),
-            ratingCount: parseFloat(ratingCountText.text().match(/\d+/g)?.[0] || '0')
-        },
-        timings: cookAndPrepTimeNodes.map((_, e) => ({
-            label: timingRegex.exec($(e).text())?.groups?.['label'],
-            duration: $(e).find('time').attr()['datetime']
-        })).toArray() as unknown as Timing[],
-        ingredients: ingreedientListNodes.map((i, e) => {
-            const text = $(e).text();
-            return {
-                name: text.split(',')[0],
-                preparation: text.split(',')[1]
+    switch (selector.type) {
+        case "Text":
+            {
+                const text = normalizeString(node.text());
+                return selector.process ? selector.process(text) : text;
             }
-        }).toArray() as Ingredient[],
-        method: methodStepsNodes.map((i, e) => ({
-            index: i + 1,
-            instruction: $(e).find('.editor-content').text(),
-        })).toArray() as unknown as Step[]
+        case "Attribute":
+            {
+                const text = normalizeString(
+                    typeof (node.attr) === "function" ?
+                        node.attr()[selector.attribute] :
+                        node.attr[selector.attribute]
+                );
+                return selector.process ? selector.process(text) : text;
+            }
     }
 }
+
+const getRating = ($: cheerio.Root, ratingConfig: RatingConfig): RecipeRating | undefined => {
+    return {
+        text: ratingConfig.text && evaluate($, ratingConfig.text) || "",
+        score: parseInt(ratingConfig.score && evaluate($, ratingConfig.score) || ""),
+        maxScore: parseInt(ratingConfig.maxScore && evaluate($, ratingConfig.maxScore) || ""),
+        votes: parseInt(ratingConfig.votes && evaluate($, ratingConfig.votes) || "")
+    };
+}
+
+const getTimings = ($: cheerio.Root, timingConfig: TimingConfig): RecipeTiming[] | undefined => {
+    const nodes = $(timingConfig.selector);
+
+    return nodes.map((_, element): RecipeTiming => {
+        const node = $(element);
+
+        return {
+            text: evaluate(node, timingConfig.text) || "",
+            duration: timingConfig.duration && evaluate(node, timingConfig.duration),
+            label: timingConfig.label && evaluate(node, timingConfig.label)
+        };
+    }).toArray() as unknown as RecipeTiming[];
+}
+
+const getIngredients = ($: cheerio.Root, ingredientConfig: IngredientConfig): RecipeIngredient[] => {
+    const nodes = $(ingredientConfig.selector);
+
+    return nodes.map((_, element): RecipeIngredient => {
+        const node = $(element);
+
+        return {
+            name: evaluate(node, ingredientConfig.name) || "",
+            preparation: ingredientConfig.preparation && evaluate(node, ingredientConfig.preparation)
+        };
+    }).toArray() as unknown as RecipeIngredient[];
+}
+
+const getMethod = ($: cheerio.Root, methodConfig: MethodConfig): RecipeStep[] => {
+    const nodes = $(methodConfig.selector);
+
+    return nodes.map((index, element): RecipeStep => {
+        const node = $(element);
+
+        return {
+            index,
+            instruction: evaluate(node, methodConfig.instruction) || ""
+        };
+    }).toArray() as unknown as RecipeStep[];
+}
+
+export class GoodFood {
+    private recipeConfigs: RecipeConfig[] = [
+        GoodFoodConfig,
+        AllRecipesConfig
+    ];
+
+    constructor() {
+    }
+
+    registerConfig = (config: RecipeConfig) => {
+        if (this.recipeConfigs.filter(c => c === config).length) {
+            return;
+        }
+
+        this.recipeConfigs.push(config);
+    }
+
+    get = async (recipeUrl: string): Promise<Recipe | null> => {
+        const url = new URL(recipeUrl);
+        const config = this.recipeConfigs.filter(c => url.host.localeCompare(c.host, undefined, { sensitivity: "accent" }) === 0)[0];
+
+        if (!config) {
+            return null;
+        }
+
+        const { body } = await got(recipeUrl, { headers: config.headers });
+        const $ = cheerio.load(body);
+
+        const title = evaluate($, config.title);
+        const description = config.description && evaluate($, config.description);
+        const image = config.image && getImage($, config.image);
+        const author = config.author && getAuthor($, config.author);
+        const skillLevel = config.skillLevel && evaluate($.root(), config.skillLevel);
+        const servingSize = parseInt(config.servingSize && evaluate($.root(), config.servingSize) || "0");
+
+        const rating = config.rating && getRating($, config.rating);
+        const timings = config.timings && getTimings($, config.timings);
+
+        const ingredients = getIngredients($, config.ingredients)
+        const method = getMethod($, config.steps);
+
+        return {
+            title: title || "",
+            description,
+            image,
+            author,
+            skillLevel,
+            servingSize,
+            rating,
+            timings,
+            ingredients,
+            method
+        }
+    }
+}
+
+const getImage = ($: cheerio.Root, image: ImageConfig) => {
+    return {
+        src: evaluate($, image.src) || "",
+        title: image.title && evaluate($, image.title),
+        alt: image.alt && evaluate($, image.alt),
+        width: image.width && parseInt(evaluate($, image.width) || ""),
+        height: image.height && parseInt(evaluate($, image.height) || "")
+    }
+}
+
+const getAuthor = ($: cheerio.Root, author: AuthorConfig): RecipeAuthor => {
+    return {
+        name: evaluate($, author.name) || "",
+        url: author.url && evaluate($, author.url),
+        image: author.image && getImage($, author.image)
+    }
+}
+
