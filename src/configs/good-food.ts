@@ -1,3 +1,4 @@
+import { getQuantity, getUnit, getIngredient, getPreparation } from '../ingredient-parser';
 import { RecipeConfig } from '../types/recipe-config';
 
 const scoreRegex: RegExp = new RegExp(/.*(?<score>\d[.\d+]?).*(?<maxScore>\d[.\d+]?).*/);
@@ -98,13 +99,24 @@ export const GoodFoodConfig: RecipeConfig = {
     },
     ingredients: {
         selector: ".post__content .recipe__ingredients ul.list > li",
-        name: {
+        text: {
             type: "Text",
-            process: (str) => str?.split(',')[0]
+        },
+        quantity: {
+            type: "Text",
+            process: (str) => getQuantity(str?.split(',')[0])
+        },
+        unit: {
+            type: "Text",
+            process: (str) => getUnit(str?.split(',')[0])
+        },
+        ingredient: {
+            type: "Text",
+            process: (str) => getIngredient(str?.split(',')[0])
         },
         preparation: {
             type: "Text",
-            process: (str) => str?.split(',')[1]?.trim()
+            process: (str) => str?.split(',')[1]?.trim() || getPreparation(str?.split(',')[0])
         }
     },
     steps: {

@@ -1,4 +1,5 @@
 import { RecipeConfig } from '../types/recipe-config';
+import { getIngredient, getPreparation, getQuantity, getUnit } from '../ingredient-parser';
 
 export const AllRecipesConfig: RecipeConfig = {
     host: "www.allrecipes.com",
@@ -77,13 +78,24 @@ export const AllRecipesConfig: RecipeConfig = {
     },
     ingredients: {
         selector: ".ingredients-section > .ingredients-item .ingredients-item-name",
-        name: {
+        text: {
             type: "Text",
-            process: (str) => str?.split(',')[0]
+        },
+        quantity: {
+            type: "Text",
+            process: (str) => getQuantity(str?.split(',')[0])
+        },
+        unit: {
+            type: "Text",
+            process: (str) => getUnit(str?.split(',')[0])
+        },
+        ingredient: {
+            type: "Text",
+            process: (str) => getIngredient(str?.split(',')[0])
         },
         preparation: {
             type: "Text",
-            process: (str) => str?.split(',')[1]?.trim()
+            process: (str) => str?.split(',')[1]?.trim() || getPreparation(str?.split(',')[0])
         }
     },
     steps: {

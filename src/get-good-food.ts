@@ -78,7 +78,10 @@ const getIngredients = ($: cheerio.Root, ingredientConfig: IngredientConfig): Re
         const node = $(element);
 
         return {
-            name: evaluate(node, ingredientConfig.name) || "",
+            text: evaluate(node, ingredientConfig.text) || "",
+            quantity: ingredientConfig.quantity && evaluate(node, ingredientConfig.quantity),
+            unit: ingredientConfig.unit && evaluate(node, ingredientConfig.unit),
+            ingredient: ingredientConfig.ingredient && evaluate(node, ingredientConfig.ingredient),
             preparation: ingredientConfig.preparation && evaluate(node, ingredientConfig.preparation)
         };
     }).toArray() as unknown as RecipeIngredient[];

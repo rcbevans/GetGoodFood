@@ -1,6 +1,7 @@
 export type RecipeIngredient = {
-    quantity?: number,
-    units?: string,
-    name: string
+    text: string
+    quantity?: string,
+    unit?: string,
+    ingredient?: string
     preparation?: string
 }

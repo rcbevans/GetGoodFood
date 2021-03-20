@@ -19,6 +19,8 @@
   },
   "dependencies": {
     "cheerio": "^1.0.0-rc.5",
+    "compromise": "^13.10.4",
+    "compromise-numbers": "^1.2.0",
     "got": "^11.8.2"
   },
   "devDependencies": {

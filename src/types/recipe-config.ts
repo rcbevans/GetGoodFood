@@ -44,7 +44,10 @@ export type NutritionConfig = {
 }
 
 export type IngredientConfig = SelectorBase & {
-    name: TextSelector | AttributeSelector
+    text: TextSelector | AttributeSelector
+    quantity?: TextSelector | AttributeSelector
+    unit?: TextSelector | AttributeSelector
+    ingredient?: TextSelector | AttributeSelector
     preparation?: TextSelector | AttributeSelector
 };
 
