@@ -1,6 +1,7 @@
-import { RecipeAuthor } from './recipe-author';
+import { Author } from './author';
+import { Comment } from './comment';
 import { RecipeTiming } from './recipe-timing';
-import { RecipeRating } from './recipe-rating';
+import { Rating } from './rating';
 import { RecipeStep } from './recipe-step';
 import { RecipeIngredient } from './recipe-ingredient';
 import { Image } from './image';
@@ -8,12 +9,14 @@ import { Image } from './image';
 export type Recipe = {
     title: string,
     description?: string,
+    notes?: string[],
     image?: Image,
     skillLevel?: string,
     servingSize?: number,
-    author?: RecipeAuthor,
-    rating?: RecipeRating,
+    author?: Author,
+    rating?: Rating,
     timings?: RecipeTiming[]
     ingredients: RecipeIngredient[],
-    method: RecipeStep[]
+    method: RecipeStep[],
+    comments?: Comment[]
 }

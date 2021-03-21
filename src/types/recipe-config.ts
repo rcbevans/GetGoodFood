@@ -26,6 +26,10 @@ export type AuthorConfig = {
     url?: TextSelector | AttributeSelector
 };
 
+export type NotesConfig = SelectorBase & {
+    text: TextSelector | AttributeSelector,
+};
+
 export type RatingConfig = {
     text: TextSelector | AttributeSelector,
     score?: TextSelector | AttributeSelector
@@ -41,6 +45,12 @@ export type TimingConfig = SelectorBase & {
 
 export type NutritionConfig = {
 
+}
+
+export type CommentConfig = SelectorBase & {
+    text: TextSelector | AttributeSelector,
+    rating?: RatingConfig,
+    author?: AuthorConfig,
 }
 
 export type IngredientConfig = SelectorBase & {
@@ -60,12 +70,14 @@ export type RecipeConfig = {
     headers?: Record<string, string | string[] | undefined>
     title: TextSelector | AttributeSelector
     description?: TextSelector | AttributeSelector
+    notes?: NotesConfig
     image?: ImageConfig
     author?: AuthorConfig
     skillLevel?: TextSelector | AttributeSelector
     servingSize?: TextSelector | AttributeSelector
     rating?: RatingConfig
     timings?: TimingConfig
+    comments?: CommentConfig
     ingredients: IngredientConfig
     steps: MethodConfig
 }

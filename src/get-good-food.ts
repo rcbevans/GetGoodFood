@@ -1,34 +1,54 @@
 import got from "got";
 import cheerio from "cheerio";
 
+import nlp from "compromise";
+
 import { Recipe } from './types/recipe';
-import { RecipeConfig, TextSelector, AttributeSelector, IngredientConfig, MethodConfig, RatingConfig, TimingConfig, AuthorConfig, ImageConfig } from './types/recipe-config';
+import { RecipeConfig, TextSelector, AttributeSelector, IngredientConfig, MethodConfig, RatingConfig, TimingConfig, AuthorConfig, ImageConfig, CommentConfig, NotesConfig } from './types/recipe-config';
 import { GoodFoodConfig } from './configs/good-food';
-import { RecipeAuthor } from './types/recipe-author';
+import { Author } from './types/author';
 import { RecipeIngredient } from './types/recipe-ingredient';
 import { RecipeStep } from './types/recipe-step';
-import { RecipeRating } from './types/recipe-rating';
+import { Rating } from './types/rating';
 import { RecipeTiming } from './types/recipe-timing';
 import { AllRecipesConfig } from './configs/all-recipes';
+import { Comment } from './types/comment';
 
-const normalizeString = (str: string) => {
-    return str
+import sentimentPlugin from './sentiment-plugin';
+
+// import foodSentimentLexicon from "./data/food-sentiment";
+
+// const extendedNlp = nlp.extend(sentimentPlugin(foodSentimentLexicon));
+
+const getSentiment = (str?: string): number | undefined => {
+    // return !!str ? extendedNlp(str).sentiment() : undefined;
+    return undefined;
+}
+
+const normalizeString = (str?: string) => {
+    return str ? str
         .replace("\r\n", "")
         .replace("\n", "")
         .replace("\t", "")
         .replace(/\s{2,}/g, " ")
-        .trim();
+        .trim() : "";
+}
+
+const getSelection = ($: cheerio.Root | cheerio.Cheerio, selector?: string): cheerio.Cheerio => {
+    const cheerioNode =
+        typeof ($) === "function" ?
+            selector ?
+                $(selector) :
+                $.root() :
+            selector ?
+                $.find(selector) :
+                $;
+
+    return cheerioNode;
 }
 
 const evaluate = ($: cheerio.Root | cheerio.Cheerio, selector: TextSelector | AttributeSelector): string | undefined => {
-    const node =
-        typeof ($) === "function" ?
-            selector.selector ?
-                $(selector.selector) :
-                $.root() :
-            selector.selector ?
-                $.find(selector.selector) :
-                $;
+    const node = getSelection($, selector.selector);
 
     switch (selector.type) {
         case "Text":
@@ -40,7 +60,7 @@ const evaluate = ($: cheerio.Root | cheerio.Cheerio, selector: TextSelector | At
             {
                 const text = normalizeString(
                     typeof (node.attr) === "function" ?
-                        node.attr()[selector.attribute] :
+                        node.attr()?.[selector.attribute] :
                         node.attr[selector.attribute]
                 );
                 return selector.process ? selector.process(text) : text;
@@ -48,7 +68,7 @@ const evaluate = ($: cheerio.Root | cheerio.Cheerio, selector: TextSelector | At
     }
 }
 
-const getRating = ($: cheerio.Root, ratingConfig: RatingConfig): RecipeRating | undefined => {
+const getRating = ($: cheerio.Root | cheerio.Cheerio, ratingConfig: RatingConfig): Rating | undefined => {
     return {
         text: ratingConfig.text && evaluate($, ratingConfig.text) || "",
         score: parseInt(ratingConfig.score && evaluate($, ratingConfig.score) || ""),
@@ -57,8 +77,18 @@ const getRating = ($: cheerio.Root, ratingConfig: RatingConfig): RecipeRating | 
     };
 }
 
+const getNotes = ($: cheerio.Root, notesConfig: NotesConfig): string[] | undefined => {
+    const nodes = getSelection($, notesConfig.selector);
+
+    return nodes.map((_, element): string => {
+        const node = $(element);
+
+        return evaluate(node, notesConfig.text) || "";
+    }).toArray() as unknown as string[];
+}
+
 const getTimings = ($: cheerio.Root, timingConfig: TimingConfig): RecipeTiming[] | undefined => {
-    const nodes = $(timingConfig.selector);
+    const nodes = getSelection($, timingConfig.selector);
 
     return nodes.map((_, element): RecipeTiming => {
         const node = $(element);
@@ -69,6 +99,40 @@ const getTimings = ($: cheerio.Root, timingConfig: TimingConfig): RecipeTiming[]
             label: timingConfig.label && evaluate(node, timingConfig.label)
         };
     }).toArray() as unknown as RecipeTiming[];
+}
+
+const getImage = ($: cheerio.Root | cheerio.Cheerio, image: ImageConfig) => {
+    return {
+        src: evaluate($, image.src) || "",
+        title: image.title && evaluate($, image.title),
+        alt: image.alt && evaluate($, image.alt),
+        width: image.width && parseInt(evaluate($, image.width) || ""),
+        height: image.height && parseInt(evaluate($, image.height) || "")
+    }
+}
+
+const getAuthor = ($: cheerio.Root | cheerio.Cheerio, authorConfig: AuthorConfig): Author => {
+    return {
+        name: evaluate($, authorConfig.name) || "",
+        url: authorConfig.url && evaluate($, authorConfig.url),
+        image: authorConfig.image && getImage($, authorConfig.image)
+    }
+}
+
+const getComments = ($: cheerio.Root, commentsConfig: CommentConfig): Comment[] => {
+    const nodes = $(commentsConfig.selector);
+
+    return nodes.map((_, element): Comment => {
+        const node = $(element);
+
+        const text = evaluate(node, commentsConfig.text);
+
+        return {
+            text: text || "",
+            sentiment: getSentiment(text),
+            author: commentsConfig.author && getAuthor(node, commentsConfig.author),
+        };
+    }).toArray() as unknown as Comment[];
 }
 
 const getIngredients = ($: cheerio.Root, ingredientConfig: IngredientConfig): RecipeIngredient[] => {
@@ -130,6 +194,7 @@ export class GoodFood {
 
         const title = evaluate($, config.title);
         const description = config.description && evaluate($, config.description);
+        const notes = config.notes && getNotes($, config.notes);
         const image = config.image && getImage($, config.image);
         const author = config.author && getAuthor($, config.author);
         const skillLevel = config.skillLevel && evaluate($.root(), config.skillLevel);
@@ -138,39 +203,24 @@ export class GoodFood {
         const rating = config.rating && getRating($, config.rating);
         const timings = config.timings && getTimings($, config.timings);
 
+        const comments = config.comments && getComments($, config.comments);
+
         const ingredients = getIngredients($, config.ingredients)
         const method = getMethod($, config.steps);
 
         return {
             title: title || "",
             description,
+            notes,
             image,
             author,
             skillLevel,
             servingSize,
             rating,
             timings,
+            comments,
             ingredients,
             method
         }
     }
 }
-
-const getImage = ($: cheerio.Root, image: ImageConfig) => {
-    return {
-        src: evaluate($, image.src) || "",
-        title: image.title && evaluate($, image.title),
-        alt: image.alt && evaluate($, image.alt),
-        width: image.width && parseInt(evaluate($, image.width) || ""),
-        height: image.height && parseInt(evaluate($, image.height) || "")
-    }
-}
-
-const getAuthor = ($: cheerio.Root, author: AuthorConfig): RecipeAuthor => {
-    return {
-        name: evaluate($, author.name) || "",
-        url: author.url && evaluate($, author.url),
-        image: author.image && getImage($, author.image)
-    }
-}
-

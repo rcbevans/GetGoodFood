@@ -11,6 +11,12 @@ export const AllRecipesConfig: RecipeConfig = {
         type: "Text",
         selector: ".recipe-content .recipe-summary > p"
     },
+    notes: {
+        selector: ".recipe-note .paragraph",
+        text: {
+            type: "Text"
+        }
+    },
     author: {
         name: {
             type: "Text",
@@ -75,6 +81,31 @@ export const AllRecipesConfig: RecipeConfig = {
             selector: ".lead-content-wrapper .image-container .lead-media",
             attribute: "data-original-height"
         },
+    },
+    comments: {
+        selector: ".recipe-reviewed-items .recipe-review-wrapper",
+        text: {
+            type: "Text",
+            selector: ".recipe-review-body span"
+        },
+        author: {
+            name: {
+                type: "Text",
+                selector: ".reviewer-name",
+            },
+            url: {
+                type: "Attribute",
+                selector: ".recipe-review-author",
+                attribute: "href"
+            },
+            image: {
+                src: {
+                    type: "Attribute",
+                    selector: ".reviewer-image",
+                    attribute: "src"
+                }
+            }
+        }
     },
     ingredients: {
         selector: ".ingredients-section > .ingredients-item .ingredients-item-name",

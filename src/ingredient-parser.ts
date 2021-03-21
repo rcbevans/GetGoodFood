@@ -21,8 +21,8 @@ export const getIngredient = (text?: string): string | undefined => {
         .not("#Unit")
         .not("#Value")
         .match("(#Adjective|#Noun)+")
-        .join('and ')
-        .text();
+        .out('array')
+        .join('and ');
 }
 
 export const getPreparation = (text?: string): string | undefined => {

@@ -4,6 +4,8 @@ A simple. but extensible Node.js scraper for recipes.
 
 Currently All Recipes and BBC Good Food are supported.
 
+Food sentiment data is based on the domain specific lexicon produced by William L. Hamilton, Kevin Clark, Jure Leskovec, Dan Jurafsky in their paper [SocialSent: Domain-Specific Sentiment Lexicons for Computational Social Science](https://nlp.stanford.edu/projects/socialsent/).
+
 ```ts
 import GetGoodFood from "get-good-food";
 

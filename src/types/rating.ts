@@ -1,4 +1,4 @@
-export type RecipeRating = {
+export type Rating = {
     text: string,
     score?: number,
     maxScore?: number,
